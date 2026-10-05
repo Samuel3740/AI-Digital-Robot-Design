@@ -12,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        # launch 폴더 안의 모든 .py 파일들을 패키지 설치 경로 복사
         (
             os.path.join('share', package_name, 'launch'),
             glob('launch/*.py')
@@ -30,6 +31,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            # 터미널에서 'ros2 run week5 hello_param_node' 명령 시
+            # week5/week5_hello_param_node.py의 main 함수 실행
             'hello_param_node = week5.week5_hello_param_node:main',
         ],
     },
