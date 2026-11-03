@@ -6,8 +6,8 @@
 
 - **설계 목표**: ROS 2 Humble 환경에서 4개의 회전 관절(`joint1`~`joint4`)을 가진 4자유도(4-DOF) 직렬형 로봇 팔을 URDF/Xacro로 모델링하고, `joint_state_publisher_gui`와 `RViz2`를 연동하여 실시간 관절 제어 및 시각화를 구현함.
 - **구조 특징**:
-  - 바닥에 고정되는 `base_link` 위에 4개의 원통형 링크(`link1`~`link4`)를 직렬로 배치하고, 각 관절 연결부(`0 0 0`)에는 가로 방향 원통형 구동부(모터 하우징) 형상을 추가하여 회전 시에도 링크가 끊어지지 않고 자연스럽게 이어지도록 설계함.
-  - 3차원 공간 운동이 가능하도록 첫 번째 관절(`joint1`)은 수평 회전(Z축, Yaw), 나머지 관절(`joint2`~`joint4`)은 상하 굴절(Y축, Pitch)로 구성함.
+  - 바닥에 고정되는 `base_link` 위에 4개의 원통형 링크(`link1`~`link4`)를 직렬로 배치함.
+  - 첫 번째 관절(`joint1`)은 베이스 위에서 수평 회전(Z축, Yaw)하고, 상하로 꺾이는 나머지 관절(`joint2`~`joint4`, Y축 Pitch) 연결부(`link2`~`link4`의 원점)에는 가로 방향 원통형 구동부 형상을 추가하여 회전 시에도 링크가 끊어지지 않고 자연스럽게 이어지도록 설계함.
   - 모든 관절의 회전 범위는 `-90° ~ +90°` (`-1.5708 ~ +1.5708 rad`)로 제한함.
 
 ---
@@ -25,7 +25,7 @@
 - **링크 본체 중심 이동 (`xyz="0 0 ${length / 2.0}"`)**:
   - URDF의 `<cylinder>`는 원통의 정중앙이 원점(`0 0 0`)에 생성되므로, 관절 회전 중심에 원통 하단이 오도록 중심을 길이의 절반(`0.1m`)만큼 Z축 위로 이동시킴.
 - **관절 구동부 회전 배치 (`xyz="0 0 0" rpy="1.5708 0 0"`)**:
-  - 각 링크의 시작점(`0 0 0`)에 작은 원통을 배치하고 Roll(X축) 방향으로 `90°`(`1.5708 rad`) 회전시켜, Y축 회전 관절과 축 방향이 일치하는 모터 구동부 형상을 표현함.
+  - 상하로 굴절되는 `link2`~`link4`의 시작점(`0 0 0`)에만 `<xacro:if>` 조건문으로 작은 원통을 배치하고 Roll(X축) 방향으로 `90°`(`1.5708 rad`) 회전시켜, Y축 회전 관절과 축 방향이 일치하는 구동부 형상을 표현함.
 - **다음 관절 연결 위치 (`<joint>`의 `origin xyz="0 0 ${link_length}"`)**:
   - 다음 관절이 이전 링크의 상단 끝점에 연결되도록 부모 링크 길이(`0.2m`)만큼 Z축으로 이동시켜 설정함.
 
@@ -33,16 +33,18 @@
 
 ```xml
 <!-- 원통형 링크 및 관절 구동부 생성 -->
-<xacro:macro name="cylinder_link" params="name length radius mass color">
+<xacro:macro name="cylinder_link" params="name length radius mass color use_joint_visual">
   <link name="${name}">
-    <!-- 관절 회전축(0 0 0) 원통형 구동부 생성 -->
-    <visual>
-      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
-      <geometry>
-        <cylinder radius="0.035" length="0.07"/>
-      </geometry>
-      <material name="${color}"/>
-    </visual>
+    <!-- Y축 회전 관절(joint2~4)에만 원통형 구동부 생성 -->
+    <xacro:if value="${use_joint_visual}">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+        <geometry>
+          <cylinder radius="0.035" length="0.07"/>
+        </geometry>
+        <material name="${color}"/>
+      </visual>
+    </xacro:if>
     <!-- 링크 원통 본체 -->
     <visual>
       <origin xyz="0 0 ${length / 2.0}" rpy="0 0 0"/>
@@ -93,7 +95,7 @@ ros2 launch robot_4dof_description display_robot.launch.py
      │
    joint1 (Revolute, Z축 회전, -90° ~ +90°)
      ▼
-  [link1] (Blue, 0.2m + 관절 구동부)
+  [link1] (Blue, 0.2m)
      │
    joint2 (Revolute, Y축 회전, -90° ~ +90°)
      ▼
@@ -114,7 +116,7 @@ ros2 launch robot_4dof_description display_robot.launch.py
 | 링크 이름 | 본체 형상 | 길이 (m) | 반지름 (m) | 본체 중심 (`origin xyz`) | 질량 (kg) | 색상 |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | `base_link` | Cylinder | 0.1 | 0.10 | `0 0 0.05` | 1.0 | Grey |
-| `link1` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Blue |
+| `link1` | Cylinder | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Blue |
 | `link2` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Green |
 | `link3` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Yellow |
 | `link4` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Red |
@@ -133,7 +135,8 @@ ros2 launch robot_4dof_description display_robot.launch.py
 
 ### 4.1 어려웠던 점
 - **원통 중심 좌표(`origin`)와 관절 벌어짐 해결**: 처음에 단순 원통만 연결했을 때는 관절을 ±90°로 꺾을 때 원통 끝단 모서리가 벌어져 떨어져 보이는 문제가 있었음. 이를 해결하기 위해 링크 본체 중심을 `length / 2.0`으로 이동시키고, 관절 원점(`0 0 0`)에 `rpy="1.5708 0 0"`으로 90° 눕힌 가로 원통형 구동부를 추가하여 회전 시에도 자연스럽게 이어지도록 개선함.
-- **다중 `<visual>` 태그 사용 시 색상 적용 문제**: 하나의 `<link>` 내부에 구동부와 본체 2개의 `<visual>` 태그를 작성했을 때, 첫 번째 `<visual>`의 `<material>` 색상(`grey`)으로 링크 전체 색상이 덮어씌워지는 RViz2 특성을 확인하고 두 `<visual>` 모두 `${color}` 변수를 참조하도록 수정하여 해결함.
+- **Z축 회전 관절(`joint1`)과 Y축 회전 관절(`joint2~4`)의 연결부 구분**: 모든 링크에 가로 원통형 구동부를 넣었을 때, Z축으로 회전하는 `base_link`와 `link1` 사이에서는 가로 원통의 아랫부분이 베이스에 파묻혀 반으로 잘려 보이는 현상이 있었음. `<xacro:if>` 조건문을 활용해 Y축으로 꺾이는 `link2`~`link4`에만 구동부가 생성되도록 수정하여 해결함.
+- **다중 `<visual>` 태그 사용 시 색상 적용 문제**: 하나의 `<link>` 내부에 구동부와 본체 2개의 `<visual>` 태그를 작성했을 때, 첫 번째 `<visual>`의 `<material>` 색상으로 링크 전체 색상이 덮어씌워지는 RViz2 특성을 확인하고 두 `<visual>` 모두 `${color}` 변수를 참조하도록 수정하여 해결함.
 
 ### 4.2 향후 개선 방향 (강의자료 10주차 내용 연계)
 - **카메라 비전(`camera.xacro`) 및 그리퍼 장착**: 10주차 강의에서 다룬 것처럼 말단 링크(`link4`) 끝에 RGB-D 카메라(Optical Frame 적용)와 그리퍼를 추가하고, `cv_bridge` 및 OpenCV HSV 색상 검출 노드를 연동하여 특정 색상의 물체를 인식하도록 확장할 수 있음.
