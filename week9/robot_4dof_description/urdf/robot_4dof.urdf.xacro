@@ -32,7 +32,7 @@
   <!-- 원통형 링크 및 관절 구동부 생성 -->
   <xacro:macro name="cylinder_link" params="name length radius mass color use_joint_visual">
     <link name="${name}">
-      <!-- Y축 회전 관절(joint2~4)에만 원통형 구동부 생성 -->
+      <!-- joint2~4 구동부 생성 -->
       <xacro:if value="${use_joint_visual}">
         <visual>
           <origin xyz="0 0 0" rpy="1.5708 0 0"/>
@@ -67,14 +67,14 @@
     </link>
   </xacro:macro>
 
-  <!-- 베이스 및 4개 로봇 팔 링크 생성 (base_link, link1은 구동부 생략) -->
+  <!-- 베이스 및 4개 로봇 팔 링크 생성 -->
   <xacro:cylinder_link name="base_link" length="${base_length}" radius="${base_radius}" mass="${base_mass}" color="grey" use_joint_visual="false"/>
   <xacro:cylinder_link name="link1" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="blue" use_joint_visual="false"/>
   <xacro:cylinder_link name="link2" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="green" use_joint_visual="true"/>
   <xacro:cylinder_link name="link3" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="yellow" use_joint_visual="true"/>
   <xacro:cylinder_link name="link4" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="red" use_joint_visual="true"/>
 
-  <!-- 4개의 회전 관절 (joint1 ~ joint4) 정의 -->
+  <!-- joint1 ~ joint4 정의 -->
   <joint name="joint1" type="revolute">
     <parent link="base_link"/>
     <child link="link1"/>
