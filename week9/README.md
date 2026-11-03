@@ -4,36 +4,46 @@
 
 ## 1. 로봇 설계 (0.5쪽)
 
-- **설계 목표**: ROS 2 Humble 환경에서 4개의 독립적인 회전 관절(`joint1`~`joint4`)을 가진 4자유도(4-DOF) 직렬형 로봇 팔을 URDF/Xacro로 모델링하고, `joint_state_publisher_gui`와 `RViz2`를 연동하여 관절 제어 및 시각화를 구현함.
+- **설계 목표**: ROS 2 Humble 환경에서 4개의 회전 관절(`joint1`~`joint4`)을 가진 4자유도(4-DOF) 직렬형 로봇 팔을 URDF/Xacro로 모델링하고, `joint_state_publisher_gui`와 `RViz2`를 연동하여 실시간 관절 제어 및 시각화를 구현함.
 - **구조 특징**:
-  - 바닥에 고정되는 `base_link` 위에 4개의 원통형 링크(`link1`~`link4`)를 직렬로 배치함.
-  - 3차원 공간 운동이 가능하도록 첫 번째 관절(`joint1`)은 수평 회전(Z축, Yaw), 나머지 관절(`joint2`~`joint4`)은 상하 굴절(Y축, Pitch)로 설계함.
-  - 모든 관절의 회전 범위는 요구사항에 맞춰 `-90° ~ +90°` (`-1.5708 ~ +1.5708 rad`)로 제한함.
+  - 바닥에 고정되는 `base_link` 위에 4개의 원통형 링크(`link1`~`link4`)를 직렬로 배치하고, 각 관절 연결부(`0 0 0`)에는 가로 방향 원통형 구동부(모터 하우징) 형상을 추가하여 회전 시에도 링크가 끊어지지 않고 자연스럽게 이어지도록 설계함.
+  - 3차원 공간 운동이 가능하도록 첫 번째 관절(`joint1`)은 수평 회전(Z축, Yaw), 나머지 관절(`joint2`~`joint4`)은 상하 굴절(Y축, Pitch)로 구성함.
+  - 모든 관절의 회전 범위는 `-90° ~ +90°` (`-1.5708 ~ +1.5708 rad`)로 제한함.
 
 ---
 
 ## 2. URDF 코드 설명 (1쪽)
 
-### 2.1 주요 태그 설명
+### 2.1 주요 태그 설명 (강의자료 25~26p 연계)
 - **`<link>`**: 로봇을 구성하는 강체(마디)를 정의하며, 하위 태그로 외형(`visual`), 충돌(`collision`), 물리 특성(`inertial`)을 포함함.
-- **`<joint>`**: 부모 링크(`parent`)와 자식 링크(`child`) 사이의 연결 관계, 회전축(`axis`), 회전 제한(`limit`)을 정의함.
-- **`<visual>`**: RViz2 화면에 표시되는 링크의 기하학적 형상(`<cylinder>`), 중심 위치(`<origin>`), 색상(`<material>`)을 지정함.
-- **`<collision>`**: 물리 엔진이나 경로 계획 시 충돌 계산에 사용되는 영역을 정의함 (본 모델에서는 `visual`과 동일한 원통 형상 적용).
-- **`<inertial>`**: 링크의 질량(`<mass>`)과 관성 모멘트 행렬(`<inertia ixx ... izz/>`) 등 동역학 시뮬레이션에 필요한 물리 속성을 정의함.
+- **`<joint>`**: 부모 링크(`parent`)와 자식 링크(`child`) 사이의 연결 위치(`origin`), 회전축(`axis`), 운동 한계(`limit`: 도달 범위 `lower/upper`, 최대 토크 `effort`, 최대 속도 `velocity`)를 정의함.
+- **`<visual>`**: RViz2 화면에 표시되는 링크의 기하학적 형상(`<cylinder>`), 위치·자세(`<origin>`), 색상(`<material>`)을 지정함.
+- **`<collision>`**: 경로 계획이나 시뮬레이션 시 충돌 계산에 사용되는 영역을 정의함.
+- **`<inertial>`**: 링크의 질량(`<mass>`)과 관성 모멘트(`<inertia>`)를 정의하며, 동역학 시뮬레이션에서 모터 과부하나 진동을 방지하기 위한 핵심 물리 파라미터임.
 
 ### 2.2 좌표계 설정 방법
-- **링크 중심 오프셋 (`<visual>`, `<collision>`, `<inertial>`의 `<origin>`)**:
-  - URDF의 `<cylinder>`는 기본적으로 원통의 정중앙이 로컬 원점(`0 0 0`)에 생성됨.
-  - 관절 회전 중심에 원통의 하단 끝점이 오도록, 원통 중심을 길이의 절반인 `xyz="0 0 ${length / 2.0}"` (`base_link`는 `0.05m`, `link1~4`는 `0.1m`)만큼 Z축으로 이동시킴.
-- **관절 위치 설정 (`<joint>`의 `<origin>`)**:
-  - 다음 관절이 이전 링크의 상단 끝점에 연결되도록, 부모 링크의 길이만큼 이동한 `xyz="0 0 ${base_length}"` (`0.1m`) 및 `xyz="0 0 ${link_length}"` (`0.2m`)로 설정함.
+- **링크 본체 중심 이동 (`xyz="0 0 ${length / 2.0}"`)**:
+  - URDF의 `<cylinder>`는 원통의 정중앙이 원점(`0 0 0`)에 생성되므로, 관절 회전 중심에 원통 하단이 오도록 중심을 길이의 절반(`0.1m`)만큼 Z축 위로 이동시킴.
+- **관절 구동부 회전 배치 (`xyz="0 0 0" rpy="1.5708 0 0"`)**:
+  - 각 링크의 시작점(`0 0 0`)에 작은 원통을 배치하고 Roll(X축) 방향으로 `90°`(`1.5708 rad`) 회전시켜, Y축 회전 관절과 축 방향이 일치하는 모터 구동부 형상을 표현함.
+- **다음 관절 연결 위치 (`<joint>`의 `origin xyz="0 0 ${link_length}"`)**:
+  - 다음 관절이 이전 링크의 상단 끝점에 연결되도록 부모 링크 길이(`0.2m`)만큼 Z축으로 이동시켜 설정함.
 
 ### 2.3 핵심 코드 발췌 (`urdf/robot_4dof.urdf.xacro`)
 
 ```xml
-<!-- 원통형 링크 생성 매크로 (link, visual, collision, inertial) -->
+<!-- 원통형 링크 및 관절 구동부 생성 -->
 <xacro:macro name="cylinder_link" params="name length radius mass color">
   <link name="${name}">
+    <!-- 관절 회전축(0 0 0) 원통형 구동부 생성 -->
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="0.035" length="0.07"/>
+      </geometry>
+      <material name="${color}"/>
+    </visual>
+    <!-- 링크 원통 본체 -->
     <visual>
       <origin xyz="0 0 ${length / 2.0}" rpy="0 0 0"/>
       <geometry>
@@ -55,12 +65,12 @@
   </link>
 </xacro:macro>
 
-<!-- 회전 관절 정의 예시 (joint1, joint2) -->
-<joint name="joint1" type="revolute">
-  <parent link="base_link"/>
-  <child link="link1"/>
-  <origin xyz="0 0 ${base_length}" rpy="0 0 0"/>
-  <axis xyz="0 0 1"/>
+<!-- 회전 관절 정의 예시 -->
+<joint name="joint2" type="revolute">
+  <parent link="link1"/>
+  <child link="link2"/>
+  <origin xyz="0 0 ${link_length}" rpy="0 0 0"/>
+  <axis xyz="0 1 0"/>
   <limit lower="-${joint_limit}" upper="${joint_limit}" effort="10.0" velocity="1.0"/>
 </joint>
 ```
@@ -83,31 +93,31 @@ ros2 launch robot_4dof_description display_robot.launch.py
      │
    joint1 (Revolute, Z축 회전, -90° ~ +90°)
      ▼
-  [link1] (Blue, 0.2m)
+  [link1] (Blue, 0.2m + 관절 구동부)
      │
    joint2 (Revolute, Y축 회전, -90° ~ +90°)
      ▼
-  [link2] (Green, 0.2m)
+  [link2] (Green, 0.2m + 관절 구동부)
      │
    joint3 (Revolute, Y축 회전, -90° ~ +90°)
      ▼
-  [link3] (Yellow, 0.2m)
+  [link3] (Yellow, 0.2m + 관절 구동부)
      │
    joint4 (Revolute, Y축 회전, -90° ~ +90°)
      ▼
-  [link4] (Red, 0.2m)
+  [link4] (Red, 0.2m + 관절 구동부)
 ```
 
 ### 3.3 각 링크 및 관절 사양 표
 
 **[링크 사양]**
-| 링크 이름 | 형상 | 길이 (m) | 반지름 (m) | 중심 위치 (`origin xyz`) | 질량 (kg) | 색상 |
+| 링크 이름 | 본체 형상 | 길이 (m) | 반지름 (m) | 본체 중심 (`origin xyz`) | 질량 (kg) | 색상 |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | `base_link` | Cylinder | 0.1 | 0.10 | `0 0 0.05` | 1.0 | Grey |
-| `link1` | Cylinder | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Blue |
-| `link2` | Cylinder | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Green |
-| `link3` | Cylinder | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Yellow |
-| `link4` | Cylinder | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Red |
+| `link1` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Blue |
+| `link2` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Green |
+| `link3` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Yellow |
+| `link4` | Cylinder (+구동부) | 0.2 | 0.03 | `0 0 0.10` | 0.5 | Red |
 
 **[관절 사양]**
 | 관절 이름 | 타입 | Parent → Child | 관절 위치 (`origin xyz`) | 회전축 (`axis`) | 회전 범위 (`rad` / `deg`) |
@@ -122,9 +132,9 @@ ros2 launch robot_4dof_description display_robot.launch.py
 ## 4. 기타
 
 ### 4.1 어려웠던 점
-- **원통 중심 좌표(`origin`)와 관절 위치 맞추기**: 처음에는 `<cylinder>`가 원점 기준으로 위아래 대칭 생성된다는 점을 간과하여 링크와 관절 위치가 겹치는 문제가 있었으나, 링크의 `<visual>` origin을 길이의 절반(`length / 2.0`)만큼 올리고 `<joint>` origin을 링크 끝점(`length`)에 두어 해결함.
-- **`joint1`의 Z축 회전 확인**: 모든 관절이 `0 rad`일 때는 로봇 팔이 수직으로 일직선이어서 원통형인 `link1`을 Z축으로 회전시켜도 외형 변화가 눈에 잘 띄지 않았음. RViz2에서 `TF` 좌표계를 켜고 `joint2`~`joint4`를 기울인 상태에서 `joint1`을 조작하여 전체 팔이 수평 회전하는 것을 확인함.
+- **원통 중심 좌표(`origin`)와 관절 벌어짐 해결**: 처음에 단순 원통만 연결했을 때는 관절을 ±90°로 꺾을 때 원통 끝단 모서리가 벌어져 떨어져 보이는 문제가 있었음. 이를 해결하기 위해 링크 본체 중심을 `length / 2.0`으로 이동시키고, 관절 원점(`0 0 0`)에 `rpy="1.5708 0 0"`으로 90° 눕힌 가로 원통형 구동부를 추가하여 회전 시에도 자연스럽게 이어지도록 개선함.
+- **다중 `<visual>` 태그 사용 시 색상 적용 문제**: 하나의 `<link>` 내부에 구동부와 본체 2개의 `<visual>` 태그를 작성했을 때, 첫 번째 `<visual>`의 `<material>` 색상(`grey`)으로 링크 전체 색상이 덮어씌워지는 RViz2 특성을 확인하고 두 `<visual>` 모두 `${color}` 변수를 참조하도록 수정하여 해결함.
 
-### 4.2 향후 개선 방향
-- **3D 메쉬 적용 및 그리퍼(Gripper) 추가**: 현재는 기본 원통 도형으로 모델링하였으나, 추후 CAD로 설계한 `.stl`/`.dae` 메쉬 파일을 적용하고 말단(`link4`) 끝에 물체를 잡는 그리퍼 관절을 추가할 수 있음.
-- **MoveIt 2 및 Gazebo 연동**: 정의해 둔 `<collision>`과 `<inertial>` 속성을 바탕으로 Gazebo 물리 시뮬레이션이나 MoveIt 2 역기구학(IK) 경로 계획을 연동하여 원하는 목표 좌표로 로봇 팔을 제어하도록 확장할 수 있음.
+### 4.2 향후 개선 방향 (강의자료 10주차 내용 연계)
+- **카메라 비전(`camera.xacro`) 및 그리퍼 장착**: 10주차 강의에서 다룬 것처럼 말단 링크(`link4`) 끝에 RGB-D 카메라(Optical Frame 적용)와 그리퍼를 추가하고, `cv_bridge` 및 OpenCV HSV 색상 검출 노드를 연동하여 특정 색상의 물체를 인식하도록 확장할 수 있음.
+- **Gazebo 시뮬레이션, `ros2_control`, MoveIt 통합**: 정의해 둔 `<collision>`, `<inertial>`, `<limit>` 파라미터를 바탕으로 Gazebo 물리 시뮬레이터와 `ros2_control` 하드웨어 인터페이스를 연결하고, MoveIt의 Motion Planning을 적용해 자율 조작(Manipulation) 시스템으로 발전시킬 수 있음.
