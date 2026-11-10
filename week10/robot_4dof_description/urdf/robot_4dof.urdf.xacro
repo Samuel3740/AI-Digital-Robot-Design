@@ -1,0 +1,194 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="robot_4dof">
+
+  <!-- 관절 회전 제한 및 링크 기본 파라미터 설정 -->
+  <xacro:property name="joint_limit" value="1.5708"/>
+
+  <xacro:property name="base_length" value="0.1"/>
+  <xacro:property name="base_radius" value="0.1"/>
+  <xacro:property name="base_mass" value="1.0"/>
+
+  <xacro:property name="link_length" value="0.2"/>
+  <xacro:property name="link_radius" value="0.03"/>
+  <xacro:property name="link_mass" value="0.5"/>
+
+  <!-- 링크별 색상 정의 -->
+  <material name="grey">
+    <color rgba="0.3 0.3 0.3 1.0"/>
+  </material>
+  <material name="blue">
+    <color rgba="0.15 0.45 0.85 1.0"/>
+  </material>
+  <material name="green">
+    <color rgba="0.2 0.7 0.35 1.0"/>
+  </material>
+  <material name="yellow">
+    <color rgba="0.95 0.8 0.15 1.0"/>
+  </material>
+  <material name="red">
+    <color rgba="0.85 0.2 0.2 1.0"/>
+  </material>
+
+  <!-- 원통형 링크 및 관절 구동부 생성 -->
+  <xacro:macro name="cylinder_link" params="name length radius mass color use_joint_visual">
+    <link name="${name}">
+      <!-- joint2~4 구동부 생성 -->
+      <xacro:if value="${use_joint_visual}">
+        <visual>
+          <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+          <geometry>
+            <cylinder radius="0.035" length="0.07"/>
+          </geometry>
+          <material name="${color}"/>
+        </visual>
+      </xacro:if>
+
+      <!-- 링크 원통 본체 -->
+      <visual>
+        <origin xyz="0 0 ${length / 2.0}" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${radius}" length="${length}"/>
+        </geometry>
+        <material name="${color}"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 ${length / 2.0}" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="${radius}" length="${length}"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 ${length / 2.0}" rpy="0 0 0"/>
+        <mass value="${mass}"/>
+        <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <link name="world"/>
+
+  <joint name="world_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 베이스 및 4개 로봇 팔 링크 생성 -->
+  <xacro:cylinder_link name="base_link" length="${base_length}" radius="${base_radius}" mass="${base_mass}" color="grey" use_joint_visual="false"/>
+  <xacro:cylinder_link name="link1" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="blue" use_joint_visual="false"/>
+  <xacro:cylinder_link name="link2" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="green" use_joint_visual="true"/>
+  <xacro:cylinder_link name="link3" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="yellow" use_joint_visual="true"/>
+  <xacro:cylinder_link name="link4" length="${link_length}" radius="${link_radius}" mass="${link_mass}" color="red" use_joint_visual="true"/>
+
+  <!-- joint1 ~ joint4 정의 -->
+  <joint name="joint1" type="revolute">
+    <parent link="base_link"/>
+    <child link="link1"/>
+    <origin xyz="0 0 ${base_length}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-${joint_limit}" upper="${joint_limit}" effort="10.0" velocity="1.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <joint name="joint2" type="revolute">
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0 0 ${link_length}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-${joint_limit}" upper="${joint_limit}" effort="10.0" velocity="1.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <joint name="joint3" type="revolute">
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0 0 ${link_length}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-${joint_limit}" upper="${joint_limit}" effort="10.0" velocity="1.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <joint name="joint4" type="revolute">
+    <parent link="link3"/>
+    <child link="link4"/>
+    <origin xyz="0 0 ${link_length}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-${joint_limit}" upper="${joint_limit}" effort="10.0" velocity="1.0"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <gazebo reference="base_link">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <gazebo reference="link1">
+    <material>Gazebo/Blue</material>
+  </gazebo>
+  <gazebo reference="link2">
+    <material>Gazebo/Green</material>
+  </gazebo>
+  <gazebo reference="link3">
+    <material>Gazebo/Yellow</material>
+  </gazebo>
+  <gazebo reference="link4">
+    <material>Gazebo/Red</material>
+  </gazebo>
+
+  <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+      <plugin>gazebo_ros2_control/GazeboSystem</plugin>
+    </hardware>
+
+    <joint name="joint1">
+      <command_interface name="position">
+        <param name="min">-${joint_limit}</param>
+        <param name="max">${joint_limit}</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint2">
+      <command_interface name="position">
+        <param name="min">-${joint_limit}</param>
+        <param name="max">${joint_limit}</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint3">
+      <command_interface name="position">
+        <param name="min">-${joint_limit}</param>
+        <param name="max">${joint_limit}</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="joint4">
+      <command_interface name="position">
+        <param name="min">-${joint_limit}</param>
+        <param name="max">${joint_limit}</param>
+      </command_interface>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <gazebo>
+    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
+      <parameters>$(find robot_4dof_description)/config/ros2_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>
